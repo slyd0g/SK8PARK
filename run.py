@@ -38,7 +38,8 @@ api.add_resource(resources.TaskAllSK8RAT, '/api/tasks')
 api.add_resource(resources.NegotiateSessionKey, '/stage0')
 api.add_resource(resources.ChallengeResponseOne, '/stage1')
 api.add_resource(resources.ChallengeResponseTwo, '/stage2')
-api.add_resource(resources.FirstCheckIn, '/firstcheckin')
+api.add_resource(resources.FirstCheckIn, '/stage3')
+api.add_resource(resources.Beaconing, '/beaconing')
 
 
 # DEBUG ONLY

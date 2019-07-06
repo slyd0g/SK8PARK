@@ -241,6 +241,16 @@ class TaskModel(db.Model):
         db.session.add(self)
         db.session.commit()
 
+    def to_json(x):
+            return {
+                'id': x.id,
+                'guid': x.guid,
+                'task_id': x.task_id,
+                'task': x.task,
+                'task_status': x.task_status,
+                'task_output': x.task_output
+            }
+            
     @classmethod
     def return_all(cls):
         def to_json(x):
@@ -278,4 +288,5 @@ class TaskModel(db.Model):
             return {'message': '{} row(s) deleted'.format(num_rows_deleted)}
         except Exception:
             return {'message': 'Something went wrong'}
+
 

