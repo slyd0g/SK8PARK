@@ -32,7 +32,6 @@ api.add_resource(resources.AllListeners, '/api/listeners')
 api.add_resource(resources.SingleListener, '/api/listeners/<listener_name>')
 api.add_resource(resources.AllSK8RATs, '/api/SK8RATs')
 api.add_resource(resources.SingleSK8RAT, '/api/SK8RATs/<SK8RAT_name>')
-api.add_resource(resources.RenameSK8RAT, '/api/SK8RATs/<SK8RAT_name>/rename')
 api.add_resource(resources.TaskSK8RAT, '/api/tasks/<SK8RAT_name>')
 api.add_resource(resources.TaskAllSK8RAT, '/api/tasks')
 api.add_resource(resources.NegotiateSessionKey, '/stage0')
@@ -56,4 +55,3 @@ def create_tables():
 def check_if_token_in_blacklist(decrypted_token):
     jti = decrypted_token['jti']
     return models.RevokedTokenModel.is_jti_blacklisted(jti)
-

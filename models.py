@@ -170,7 +170,7 @@ class ListenerModel(db.Model):
     ip = db.Column(db.String(120), nullable=False)
     port = db.Column(db.Integer, nullable=False)
     listener_type = db.Column(db.String(120), nullable=False)
-    staging_key = db.Column(db.String(120), nullable=False)
+    shared_key = db.Column(db.String(120), nullable=False)
 
     def save_to_db(self):
         db.session.add(self)
@@ -186,7 +186,7 @@ class ListenerModel(db.Model):
                 'ip': x.ip,
                 'port': x.port,
                 'listener_type': x.listener_type,
-                'staging_key': x.staging_key,
+                'shared_key': x.shared_key,
             }
         return {'listeners': list(map(lambda x: to_json(x),
                 ListenerModel.query.all()))}
@@ -210,7 +210,7 @@ class ListenerModel(db.Model):
                 'ip': x.ip,
                 'port': x.port,
                 'listener_type': x.listener_type,
-                'staging_key': x.staging_key,
+                'shared_key': x.shared_key,
             }
         listener = ListenerModel.query.filter(ListenerModel.name == listener_name).one_or_none()
         if listener is not None:
