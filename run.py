@@ -34,17 +34,6 @@ api.add_resource(resources.AllSK8RATs, '/api/SK8RATs')
 api.add_resource(resources.SingleSK8RAT, '/api/SK8RATs/<SK8RAT_name>')
 api.add_resource(resources.TaskSK8RAT, '/api/tasks/<SK8RAT_name>')
 api.add_resource(resources.TaskAllSK8RAT, '/api/tasks')
-api.add_resource(resources.NegotiateSessionKey, '/stage0')
-api.add_resource(resources.ChallengeResponseOne, '/stage1')
-api.add_resource(resources.ChallengeResponseTwo, '/stage2')
-api.add_resource(resources.FirstCheckIn, '/stage3')
-api.add_resource(resources.Beaconing, '/beaconing')
-
-
-# DEBUG ONLY
-api.add_resource(resources.sessiontest1, '/sessiontest1')
-api.add_resource(resources.sessiontest2, '/sessiontest2')
-
 
 @app.before_first_request
 def create_tables():
