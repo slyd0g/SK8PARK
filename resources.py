@@ -7,11 +7,7 @@ from flask_jwt_extended import (create_access_token, create_refresh_token,
                                 get_jwt_identity, get_raw_jwt)
 import nacl.secret
 import nacl.utils
-from nacl.public import PrivateKey, SealedBox
-from nacl import encoding
 import base64
-import random
-import string
 import json
 import subprocess
 
@@ -29,9 +25,9 @@ parser.add_argument('password',
 
 #  /api/version
 class Version(Resource):
-    @jwt_required
+    # @jwt_required
     def get(self):
-        return {'version': '1.0'}
+        return {"version": "1.0"}
 
 
 #  /api/admin/login
@@ -124,7 +120,7 @@ class AdminUsers(Resource):
 
 #  /api/listeners/http
 class CreateListener(Resource):
-    #  @jwt_required
+    @jwt_required
     def post(self):
         if not request.is_json:
             return {'message': 'Invalid JSON object'}
@@ -147,7 +143,7 @@ class CreateListener(Resource):
             shared_key=sharedkey_b64
         )
         new_listener.save_to_db()
-   
+
         # Start listener
         port = str(new_listener.port)
         subprocess.Popen(["./start_listener.sh", port])
@@ -157,18 +153,18 @@ class CreateListener(Resource):
 
 #  /api/listeners
 class AllListeners(Resource):
-    #  @jwt_required
+    @jwt_required
     def get(self):
         return ListenerModel.return_all()
 
-    #  @jwt_required
+    @jwt_required
     def delete(self):
         return ListenerModel.delete_all()
 
 
 #  /api/listeners/<name>
 class SingleListener(Resource):
-    #  @jwt_required
+    @jwt_required
     def get(self, listener_name):
         return ListenerModel.return_single(listener_name)
 
@@ -177,40 +173,33 @@ class SingleListener(Resource):
         return ListenerModel.delete_single(listener_name)
 
 
-#  /api/listeners/options/<listener type>
-class OptionsListener(Resource):
-    @jwt_required
-    def get(self):
-        return "TO-DO (return listener options)"
-
-
 #  /api/SK8RATs
 class AllSK8RATs(Resource):
-    #  @jwt_required
+    @jwt_required
     def get(self):
         return SK8RATModel.return_all()
 
-    #  @jwt_required
+    @jwt_required
     def delete(self):
         return SK8RATModel.delete_all()
 
 
 #  /api/SK8RATs/<name>
 class SingleSK8RAT(Resource):
-    #  @jwt_required
+    @jwt_required
     def get(self, SK8RAT_name):
         return SK8RATModel.return_single(SK8RAT_name)
 
-    #  @jwt_required
+    @jwt_required
     def delete(self, SK8RAT_name):
         return SK8RATModel.delete_single(SK8RAT_name)
 
-    #  @jwt_required
+    @jwt_required
     def post(self, SK8RAT_name):
         # Get raw request and read as json blob
         request_raw = request.data.decode("UTF-8")
         json_blob = json.loads(request_raw)
-       
+
         # Update name, sleep and jitter
         SK8RAT = SK8RATModel.query.filter(SK8RATModel.name == SK8RAT_name).first()
         if (json_blob['name'] != ""):
@@ -226,7 +215,7 @@ class SingleSK8RAT(Resource):
 
 #  /api/tasks/<name>, accepts {"task":"<tasking>"}
 class TaskSK8RAT(Resource):
-    #  @jwt_required
+    @jwt_required
     def post(self, SK8RAT_name):
         # Get raw request and read as json blob
         request_raw = request.data.decode("UTF-8")
@@ -254,7 +243,7 @@ class TaskSK8RAT(Resource):
             )
         else:
             # task was found, find most recent task_id for this guid, add 1
-            task2 = TaskModel.query.filter(TaskModel.guid == guid).order_by(TaskModel.task_id.desc()).first()       
+            task2 = TaskModel.query.filter(TaskModel.guid == guid).order_by(TaskModel.task_id.desc()).first()    
             new_task = TaskModel(
                 guid=guid,
                 task_id=task2.task_id + 1,
@@ -262,13 +251,13 @@ class TaskSK8RAT(Resource):
                 task_status="wait",
                 task_output=""
             )
-        
+
         new_task.save_to_db()
         message = "Task " + json_blob['task'] + " with task id " + str(new_task.task_id) +\
                   " assigned to " + SK8RAT.name + "."
         return {'message': message}
 
-    #  @jwt_required
+    @jwt_required
     def get(self, SK8RAT_name):
         # Check SK8RAT by name
         SK8RAT = SK8RATModel.query.filter(SK8RATModel.name == SK8RAT_name).first()
@@ -281,11 +270,10 @@ class TaskSK8RAT(Resource):
 
 #  /api/tasks/
 class TaskAllSK8RAT(Resource):
-    #  @jwt_required
+    @jwt_required
     def get(self):
         return TaskModel.return_all()
-  
-    #  @jwt_required
+
+    @jwt_required
     def delete(self):
         return TaskModel.delete_all()
-
